@@ -26,9 +26,11 @@
       "main.js",
       "preload.js",
       "index.html",
+      "renderer.js",
       "style.css",
-      "scripts.js",
       "sshConfigHelper.js",
+      "manage.js",
+      "manage.html",
       "package.json"
     ],
     "extraMetadata": {

@@ -1,36 +1,67 @@
-// main.js
-const { app, BrowserWindow, ipcMain, Menu } = require('electron');
-const path = require('path');
+const { app, BrowserWindow, ipcMain, Menu, nativeTheme } = require('electron');
 const { Client } = require('ssh2');
 const getSSHConfigForAlias = require('./sshConfigHelper');
 
 let mainWindow;
 
 function createMainWindow() {
+    const bgColor = nativeTheme.shouldUseDarkColors ? '#333' : '#fff';
     mainWindow = new BrowserWindow({
         width: 800,
         height: 600,
+        backgroundColor: bgColor,
+        vibrancy: process.platform === 'darwin' ? (nativeTheme.shouldUseDarkColors ? 'dark' : 'light') : undefined,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
         },
     });
     mainWindow.loadFile('index.html');
+}
 
-    const template = [
+function createManageWindow() {
+    const manageWindow = new BrowserWindow({
+        width: 600,
+        height: 600,
+        title: 'Manage SSH Connections',
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false,
+        },
+    });
+    manageWindow.loadFile('manage.html');
+}
+
+function createAppMenu() {
+    const menuTemplate = [
         {
             label: 'File',
             submenu: [
-                { role: 'quit' }
+                {
+                    label: 'Manage SSH Connections',
+                    click: () => {
+                        createManageWindow();
+                    },
+                },
+                { role: 'quit' },
             ],
-        }
+        },
+        {
+            label: 'View',
+            submenu: [
+                { role: 'reload' },
+                { role: 'toggleDevTools' },
+            ],
+        },
     ];
-    const menu = Menu.buildFromTemplate(template);
-    Menu.setApplicationMenu(menu);
-
+    return Menu.buildFromTemplate(menuTemplate);
 }
 
-app.whenReady().then(createMainWindow);
+app.whenReady().then(() => {
+    createMainWindow();
+    const menu = createAppMenu();
+    Menu.setApplicationMenu(menu);
+});
 
 ipcMain.on('fetch-docker-stats', (event, connectionInput) => {
     let connectionData;
@@ -38,7 +69,8 @@ ipcMain.on('fetch-docker-stats', (event, connectionInput) => {
         if (connectionInput && connectionInput.hostAlias) {
             connectionData = getSSHConfigForAlias(connectionInput.hostAlias);
         } else {
-            throw new Error('Host alias is required in the connection input.');
+            event.reply('docker-stats-error', 'Host alias is required.');
+            return;
         }
     } catch (err) {
         event.reply('docker-stats-error', err.message);
@@ -47,7 +79,6 @@ ipcMain.on('fetch-docker-stats', (event, connectionInput) => {
 
     const ssh = new Client();
     ssh.on('ready', () => {
-        console.log('SSH connection established using config file.');
         const cmd = 'docker stats --no-stream --format "{{json .}}"';
         ssh.exec(cmd, (err, stream) => {
             if (err) {
@@ -69,7 +100,6 @@ ipcMain.on('fetch-docker-stats', (event, connectionInput) => {
     });
 
     ssh.on('error', (err) => {
-        console.error(`SSH Error: ${err}`);
         event.reply('docker-stats-error', err.message);
     });
 

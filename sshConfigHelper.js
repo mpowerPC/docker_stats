@@ -6,7 +6,6 @@ const SSHConfig = require('ssh-config');
 function getSSHConfigForAlias(hostAlias) {
     const homeDir = process.env.HOME || process.env.USERPROFILE;
     const configPath = path.join(homeDir, '.ssh', 'config');
-
     if (!fs.existsSync(configPath)) {
         throw new Error('No SSH config file found.');
     }
@@ -20,10 +19,11 @@ function getSSHConfigForAlias(hostAlias) {
     }
 
     let identityFile;
-    let identityKey = opts.IdentityFile || opts.identityfile;
-    if (identityKey) {
-        const keyPath = Array.isArray(identityKey) ? identityKey[0] : identityKey;
-        identityFile = keyPath.replace(/^~(?=$|\/)/, homeDir);
+    if (opts.identityfile) {
+        const keyPath = Array.isArray(opts.identityfile) ? opts.identityfile[0] : opts.identityfile;
+        identityFile = path.resolve(
+            keyPath.startsWith('~') ? keyPath.replace(/^~(?=$|[\/\\])/, homeDir) : keyPath
+        );
     } else {
         identityFile = path.join(homeDir, '.ssh', 'id_rsa');
     }
@@ -36,7 +36,7 @@ function getSSHConfigForAlias(hostAlias) {
         host: opts.HostName || hostAlias,
         port: opts.Port ? parseInt(opts.Port, 10) : 22,
         username: opts.User,
-        privateKey: identityFile ? fs.readFileSync(identityFile) : undefined,
+        privateKey: fs.readFileSync(identityFile),
     };
 }
 

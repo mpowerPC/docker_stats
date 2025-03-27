@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Manage SSH Connections</title>
+    <link rel="stylesheet" type="text/css" href="style.css" />
+</head>
+<body>
+<h1>SSH Connections (from .ssh/config)</h1>
+<ul id="sshList"></ul>
+<hr>
+<h2>Select Docker Stats Keys to Display</h2>
+<form id="keysForm">
+    <label><input type="checkbox" name="dockerKey" value="Container" /> Container</label><br>
+    <label><input type="checkbox" name="dockerKey" value="Name" /> Name</label><br>
+    <label><input type="checkbox" name="dockerKey" value="CPUPerc" /> CPU %</label><br>
+    <label><input type="checkbox" name="dockerKey" value="MemUsage" /> Memory Usage</label><br>
+    <label><input type="checkbox" name="dockerKey" value="MemPerc" /> Memory %</label><br>
+    <label><input type="checkbox" name="dockerKey" value="NetIO" /> Network I/O</label><br>
+    <label><input type="checkbox" name="dockerKey" value="BlockIO" /> Block I/O</label><br>
+    <label><input type="checkbox" name="dockerKey" value="PIDs" /> PIDs</label><br>
+    <button type="submit">Save Keys</button>
+</form>
+<script src="manage.js"></script>
+</body>
+</html>

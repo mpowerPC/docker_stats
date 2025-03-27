@@ -1,37 +1,13 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <title>Docker Stats Viewer</title>
+    <title>Docker Stats</title>
+    <link rel="stylesheet" type="text/css" href="style.css" />
 </head>
 <body>
-<h1>Docker Stats Viewer</h1>
-
-<label for="hostAlias">Enter Host Alias (from .ssh/config):</label>
-<input type="text" id="hostAlias" placeholder="e.g., myserver" />
 <button id="fetchButton">Fetch Docker Stats</button>
-
 <div id="statsContainer"></div>
-<script>
-    const { ipcRenderer } = require('electron');
-
-    document.getElementById('fetchButton').addEventListener('click', () => {
-        const hostAlias = document.getElementById('hostAlias').value.trim();
-        if (!hostAlias) {
-            return alert('Please enter a valid host alias.');
-        }
-        ipcRenderer.send('fetch-docker-stats', { hostAlias });
-    });
-
-    ipcRenderer.on('docker-stats-data', (event, data) => {
-        const container = document.getElementById('statsContainer');
-        container.innerHTML = `<pre>${data}</pre>`;
-    });
-
-    ipcRenderer.on('docker-stats-error', (event, errorMessage) => {
-        const container = document.getElementById('statsContainer');
-        container.textContent = `Error: ${errorMessage}`;
-    });
-</script>
+<script src="renderer.js"></script>
 </body>
 </html>
