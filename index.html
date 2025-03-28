@@ -1,13 +1,95 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8" />
     <title>Docker Stats</title>
     <link rel="stylesheet" type="text/css" href="style.css" />
 </head>
 <body>
-<button id="fetchButton">Fetch Docker Stats</button>
-<div id="statsContainer"></div>
+<div id="titleBar" class="custom-title-bar">
+    <div id="titleBarLeft">
+        <span id="windowTitle">Docker Stats</span>
+    </div>
+    <div id="titleBarRight">
+        <button id="settingsButton" class="titleBarButton" title="Settings">&#9881;</button>
+        <div class="vertical-divider"></div>
+        <button id="minimizeButton" class="titleBarButton" title="Minimize">&#8211;</button>
+        <button id="fullscreenButton" class="titleBarButton" title="Toggle Fullscreen">&#9633;</button>
+        <button id="closeButton" class="titleBarButton" title="Close">X</button>
+    </div>
+</div>
+<div id="mainContent">
+    <div id="statsView">
+        <button id="fetchButton">Fetch Docker Stats</button>
+        <div id="statsContainer"></div>
+    </div>
+    <div id="settingsOverlay" class="overlay">
+        <div class="overlayContainer">
+            <div class="settingsHeader">
+                <div class="settingsHeaderLeft"></div>
+                <div class="settingsHeaderCenter">
+                    <h2>Settings</h2>
+                </div>
+                <div class="settingsHeaderRight">
+                    <button id="closeSettingsButton" class="closeButton">X</button>
+                </div>
+            </div>
+            <div class="settingsContent">
+                <div class="settingsMenu">
+                    <ul>
+                        <li id="menuSSHConnections" class="menuItem active">SSH Connections</li>
+                        <li id="menuDockerFields" class="menuItem">Docker Stats Fields</li>
+                        <li id="menuAppearance" class="menuItem">Appearance</li>
+                    </ul>
+                </div>
+                <div class="settingsMain">
+                    <div class="settingsPanelHeader">
+                        <h3 id="settingsPanelTitle">SSH Connections</h3>
+                    </div>
+                    <div class="settingsPanelContent">
+                        <div id="settingsSSHConnections" class="settingsPanel active">
+                            <label for="sshDropdown">Select SSH Connection:</label>
+                            <select id="sshDropdown"></select>
+                        </div>
+                        <div id="settingsDockerFields" class="settingsPanel">
+                            <form id="keysForm">
+                                <label><input type="checkbox" name="dockerKey" value="Container" /> Container</label><br />
+                                <label><input type="checkbox" name="dockerKey" value="Name" /> Name</label><br />
+                                <label><input type="checkbox" name="dockerKey" value="CPUPerc" /> CPU %</label><br />
+                                <label><input type="checkbox" name="dockerKey" value="MemUsage" /> Memory Usage</label><br />
+                                <label><input type="checkbox" name="dockerKey" value="MemPerc" /> Memory %</label><br />
+                                <label><input type="checkbox" name="dockerKey" value="NetIO" /> Network I/O</label><br />
+                                <label><input type="checkbox" name="dockerKey" value="BlockIO" /> Block I/O</label><br />
+                                <label><input type="checkbox" name="dockerKey" value="PIDs" /> PIDs</label><br />
+                            </form>
+                        </div>
+                        <div id="settingsAppearance" class="settingsPanel">
+                            <div class="appearance-container">
+                                <h3>Theme</h3>
+                                <p>Select your appearance setting:</p>
+                                <div class="theme-options">
+                                    <div class="theme-option" data-theme="light" style="background-color: #FFFFFF;"></div>
+                                    <div class="theme-option" data-theme="dark" style="background-color: #2F3136;"></div>
+                                    <div class="theme-option" data-theme="default" style="background-color: var(--accent);">
+                                        <div class="refresh-icon">&#8635;</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <form id="appearanceForm" style="display: none;">
+                                <input type="hidden" name="theme" value="default">
+                            </form>
+                        </div>
+                    </div>
+                    <div class="settingsPanelFooter">
+                        <button id="sshApplyButton" class="apply-button">Apply</button>
+                        <button id="dockerApplyButton" class="apply-button">Apply</button>
+                        <button id="themeApplyButton" class="apply-button">Apply</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 <script src="renderer.js"></script>
 </body>
 </html>

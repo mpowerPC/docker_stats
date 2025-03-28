@@ -6,6 +6,7 @@ const SSHConfig = require('ssh-config');
 function getSSHConfigForAlias(hostAlias) {
     const homeDir = process.env.HOME || process.env.USERPROFILE;
     const configPath = path.join(homeDir, '.ssh', 'config');
+
     if (!fs.existsSync(configPath)) {
         throw new Error('No SSH config file found.');
     }
@@ -20,7 +21,9 @@ function getSSHConfigForAlias(hostAlias) {
 
     let identityFile;
     if (opts.identityfile) {
-        const keyPath = Array.isArray(opts.identityfile) ? opts.identityfile[0] : opts.identityfile;
+        const keyPath = Array.isArray(opts.identityfile)
+            ? opts.identityfile[0]
+            : opts.identityfile;
         identityFile = path.resolve(
             keyPath.startsWith('~') ? keyPath.replace(/^~(?=$|[\/\\])/, homeDir) : keyPath
         );
@@ -40,4 +43,40 @@ function getSSHConfigForAlias(hostAlias) {
     };
 }
 
-module.exports = getSSHConfigForAlias;
+function getAllSSHConnections() {
+    const homeDir = process.env.HOME || process.env.USERPROFILE;
+    const configPath = path.join(homeDir, '.ssh', 'config');
+
+    if (!fs.existsSync(configPath)) {
+        throw new Error('No SSH config file found.');
+    }
+
+    const configContent = fs.readFileSync(configPath, 'utf8');
+    const config = SSHConfig.parse(configContent);
+    const hosts = [];
+
+    config.forEach(entry => {
+        if (entry.param && entry.param.trim().toLowerCase() === 'host') {
+            if (Array.isArray(entry.value)) {
+                entry.value.forEach(alias => {
+                    alias = alias.trim();
+                    if (alias !== '*' && !hosts.includes(alias)) {
+                        hosts.push(alias);
+                    }
+                });
+            } else {
+                const alias = entry.value.trim();
+                if (alias !== '*' && !hosts.includes(alias)) {
+                    hosts.push(alias);
+                }
+            }
+        }
+    });
+
+    return hosts;
+}
+
+module.exports = {
+    getSSHConfigForAlias,
+    getAllSSHConnections,
+};

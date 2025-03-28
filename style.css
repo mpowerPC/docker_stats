@@ -1,34 +1,365 @@
 /* style.css */
+:root {
+    --primary-bg: #F7F7F7;
+    --secondary-bg: #FFFFFF;
+    --accent: #007acc;
+    --primary-text: #333333;
+    --secondary-text: #666666;
+    --border-color: #CCCCCC;
+    --button-bg: #0084ff;
+    --button-hover: #006edc;
+    --table-header-bg: #f4f4f4;
+    --checkbox-bg: #F0F0F0;
+    --checkbox-border: #CCCCCC;
+    --titlebar-text: #ffffff;
+}
+
+[data-theme="dark"] {
+    --primary-bg: #1C1C1E;
+    --secondary-bg: #2C2C2E;
+    --accent: #D32F2F;
+    --primary-text: #FFFFFF;
+    --secondary-text: #C7C7CC;
+    --border-color: #3A3A3C;
+    --button-bg: #C62828;
+    --button-hover: #B71C1C;
+    --table-header-bg: #2C2C2E;
+    --checkbox-bg: #2A2A2C;
+    --checkbox-border: #56565A;
+    --titlebar-text: #FFFFFF;
+}
+
 body {
     margin: 0;
     padding: 0;
-    font-family: sans-serif;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    background-color: var(--primary-bg);
+    color: var(--primary-text);
+}
+
+.custom-title-bar {
+    height: 25px;
+    background-color: var(--accent);
+    color: var(--titlebar-text);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    -webkit-app-region: drag;
+    padding: 0 10px;
+}
+
+#titleBarLeft {
+    display: flex;
+    align-items: center;
+}
+
+#windowTitle {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+#titleBarRight {
+    display: flex;
+    align-items: center;
+}
+
+.titleBarButton {
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    width: 25px;
+    height: 25px;
+    -webkit-app-region: no-drag;
+    transition: background 0.2s;
+}
+
+.titleBarButton:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.vertical-divider {
+    width: 1px;
+    height: 70%;
+    background-color: #fff;
+    margin: 0 5px;
+}
+
+#mainContent {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 25px);
+    overflow: hidden;
+}
+
+#statsView {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 20px;
+    background-color: var(--secondary-bg);
 }
 
 #statsContainer table {
-    margin: 0;
-    border-collapse: collapse;
     width: 100%;
+    border-collapse: collapse;
+    margin: 0;
 }
 
 #statsContainer th,
 #statsContainer td {
     padding: 10px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
     text-align: center;
 }
 
 #statsContainer th {
-    background-color: #f4f4f4;
+    background-color: var(--table-header-bg);
 }
 
-#sshList {
-    list-style-type: none;
+button {
+    background-color: var(--button-bg);
+    color: #fff;
+    border: none;
+    padding: 8px 12px;
+    font-size: 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+button:hover {
+    background-color: var(--button-hover);
+}
+
+.titleBarButton,
+.closeButton {
+    background-color: transparent;
     padding: 0;
+    border-radius: 0;
+    font-size: inherit;
 }
 
-#sshList li {
-    margin: 5px 0;
-    padding: 5px;
-    border-bottom: 1px solid #ccc;
+input[type="checkbox"] {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-color: var(--checkbox-bg);
+    width: 18px;
+    height: 18px;
+    border: 1px solid var(--checkbox-border);
+    border-radius: 4px;
+    cursor: pointer;
+    vertical-align: middle;
+    margin-right: 8px;
+    position: relative;
+    outline: none;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+input[type="checkbox"]:hover {
+    border-color: var(--button-bg);
+}
+
+input[type="checkbox"]:checked {
+    background-color: var(--button-bg);
+    border-color: var(--button-bg);
+}
+
+input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 6px;
+    width: 4px;
+    height: 9px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    z-index: 1000;
+}
+
+.overlayContainer {
+    background: var(--primary-bg);
+    width: 90%;
+    max-width: 800px;
+    height: 80%;
+    margin: 5% auto;
+    display: flex;
+    flex-direction: column;
+    border-radius: 5px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.settingsHeader {
+    background-color: var(--accent);
+    color: var(--titlebar-text);
+    height: 40px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    -webkit-app-region: drag;
+}
+
+.settingsHeaderCenter {
+    flex-grow: 1;
+    text-align: center;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.settingsHeaderRight {
+    -webkit-app-region: no-drag;
+}
+
+.closeButton {
+    background: transparent;
+    border: none;
+    color: var(--titlebar-text);
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.settingsContent {
+    flex-grow: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.settingsMenu {
+    width: 175px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border-color);
+    padding: 10px;
+    background-color: var(--secondary-bg);
+}
+
+.settingsMenu ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.settingsMenu .menuItem {
+    padding: 10px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+    transition: background 0.2s;
+}
+
+.settingsMenu .menuItem:hover {
+    background-color: var(--button-hover);
+}
+
+.settingsMenu .menuItem.active {
+    background-color: var(--accent);
+    color: var(--titlebar-text);
+}
+
+.settingsMain {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.settingsPanelHeader {
+    padding: 20px;
+    text-align: center;
+    background-color: var(--secondary-bg);
+}
+.settingsPanelHeader h3 {
+    margin: 0;
+    font-size: 18px;
+    color: var(--primary-text);
+}
+
+.settingsPanelContent {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 20px;
+    background-color: var(--primary-bg);
+}
+
+.settingsPanelFooter {
+    padding: 10px 20px;
+    background-color: var(--primary-bg);
+    text-align: right;
+}
+
+.apply-button {
+    padding: 10px 20px;
+}
+
+#sshDropdown {
+    width: 100%;
+    padding: 8px;
+    font-size: 14px;
+    margin: 10px 0;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--secondary-bg);
+    color: var(--primary-text);
+}
+
+.appearance-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-grow: 1;
+}
+
+.appearance-container h3 {
+    margin: 0;
+    font-size: 18px;
+    color: var(--primary-text);
+}
+.appearance-container p {
+    margin: 5px 0 15px 0;
+    font-size: 14px;
+    color: var(--primary-text);
+}
+
+.theme-options {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.theme-option {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    position: relative;
+    cursor: pointer;
+    border: 2px solid var(--border-color);
+    transition: border 0.2s;
+}
+
+.theme-option:hover {
+    border: 2px solid var(--accent);
+}
+
+.theme-option.selected {
+    border: 2px solid var(--accent);
+}
+
+.theme-option .refresh-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 20px;
+    color: var(--primary-text);
 }
