@@ -57,6 +57,24 @@ function getAllSSHConnections() {
 
     config.forEach(entry => {
         if (entry.param && entry.param.trim().toLowerCase() === 'host') {
+            let ignoreEntry = false;
+            if (entry.config && Array.isArray(entry.config)) {
+                entry.config.forEach(sub => {
+                    if (
+                        sub.param &&
+                        sub.param.trim().toLowerCase() === 'user' &&
+                        sub.value &&
+                        sub.value.trim().toLowerCase() === 'git'
+                    ) {
+                        ignoreEntry = true;
+                    }
+                });
+            }
+
+            if (ignoreEntry) {
+                return;
+            }
+
             if (Array.isArray(entry.value)) {
                 entry.value.forEach(alias => {
                     alias = alias.trim();

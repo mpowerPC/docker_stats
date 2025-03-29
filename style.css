@@ -125,7 +125,7 @@ button {
     font-size: 14px;
     border-radius: 4px;
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    box-shadow: 0 3px 5px rgba(0, 0, 0, 0.2);
 }
 
 button:hover {
@@ -300,6 +300,12 @@ input[type="checkbox"]:checked::after {
 
 .apply-button {
     padding: 10px 20px;
+    transition: all 0.1s ease-out;
+}
+
+.apply-button:active {
+    transform: translateY(2px);
+    box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.3);
 }
 
 #sshDropdown {
@@ -311,6 +317,60 @@ input[type="checkbox"]:checked::after {
     border-radius: 4px;
     background-color: var(--secondary-bg);
     color: var(--primary-text);
+}
+
+#sshExtra {
+    margin-top: 15px;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--secondary-bg);
+}
+
+#currentSSHConnectionContainer {
+    margin-bottom: 10px;
+}
+
+#currentSSHConnectionContainer label {
+    font-weight: bold;
+}
+
+#useConnectionContainer {
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+}
+
+#useConnectionContainer input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+#dockerAppsGrid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.docker-app-item {
+    padding: 8px 12px;
+    margin: 5px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+    background-color: var(--secondary-bg);
+    color: var(--primary-text);
+}
+
+.docker-app-item:hover {
+    background-color: var(--button-hover);
+    border-color: var(--button-hover);
+}
+
+.docker-app-item.selected {
+    background-color: var(--button-bg);
+    border-color: var(--button-bg);
+    color: #fff;
 }
 
 .appearance-container {
@@ -329,6 +389,18 @@ input[type="checkbox"]:checked::after {
     margin: 5px 0 15px 0;
     font-size: 14px;
     color: var(--primary-text);
+}
+
+.light-theme {
+    background-color: #FFFFFF;
+}
+
+.dark-theme {
+    background-color: #2F3136;
+}
+
+.reset-theme {
+    background-color: var(--accent);
 }
 
 .theme-options {
@@ -362,4 +434,45 @@ input[type="checkbox"]:checked::after {
     transform: translate(-50%, -50%);
     font-size: 20px;
     color: var(--primary-text);
+}
+
+.app-section {
+    margin-bottom: 20px;
+}
+
+.app-section h4 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--primary-text);
+}
+
+.app-section p {
+    margin: 5px 0 10px;
+    font-size: 14px;
+    color: var(--primary-text);
+}
+
+.app-section {
+    margin-bottom: 20px;
+}
+.app-section h4 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--primary-text);
+}
+.app-section p {
+    margin: 5px 0 10px;
+    font-size: 14px;
+    color: var(--primary-text);
+}
+.checkbox-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.error-message {
+    color: red;
 }

@@ -1,9 +1,14 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8" />
     <title>Docker Stats</title>
     <link rel="stylesheet" type="text/css" href="style.css" />
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      style-src 'self';
+      script-src 'self';
+    ">
 </head>
 <body>
 <div id="titleBar" class="custom-title-bar">
@@ -37,21 +42,47 @@
             <div class="settingsContent">
                 <div class="settingsMenu">
                     <ul>
-                        <li id="menuSSHConnections" class="menuItem active">SSH Connections</li>
-                        <li id="menuDockerFields" class="menuItem">Docker Stats Fields</li>
+                        <li id="menuApplication" class="menuItem">Application</li>
+                        <li id="menuSSHConnections" class="menuItem active">Connections</li>
+                        <li id="menuTableFields" class="menuItem">Table Fields</li>
                         <li id="menuAppearance" class="menuItem">Appearance</li>
                     </ul>
                 </div>
                 <div class="settingsMain">
                     <div class="settingsPanelHeader">
-                        <h3 id="settingsPanelTitle">SSH Connections</h3>
+                        <h3 id="settingsPanelTitle"></h3>
                     </div>
                     <div class="settingsPanelContent">
-                        <div id="settingsSSHConnections" class="settingsPanel active">
+                        <div id="settingsApplication" class="settingsPanel active">
+                            <div class="app-section">
+                                <h4>System Startup Behavior</h4>
+                                <p>Select how the app starts at system login:</p>
+                                <div class="checkbox-container">
+                                    <input type="checkbox" id="startupCheckbox">
+                                    <label for="startupCheckbox">Open on Startup</label>
+                                </div>
+                            </div>
+
+                        </div>
+                        <div id="settingsSSHConnections" class="settingsPanel">
                             <label for="sshDropdown">Select SSH Connection:</label>
                             <select id="sshDropdown"></select>
+                            <div id="sshExtra">
+                                <div id="currentSSHConnectionContainer">
+                                    <label>Current SSH Connection: </label>
+                                    <span id="currentSSHConnection"></span>
+                                </div>
+                                <div id="useConnectionContainer">
+                                    <input type="checkbox" id="useConnectionCheckbox" />
+                                    <label for="useConnectionCheckbox">Use this connection in Docker stats</label>
+                                </div>
+                                <div id="dockerAppsContainer">
+                                    <label>Docker Apps:</label>
+                                    <div id="dockerAppsGrid"></div>
+                                </div>
+                            </div>
                         </div>
-                        <div id="settingsDockerFields" class="settingsPanel">
+                        <div id="settingsTableFields" class="settingsPanel">
                             <form id="keysForm">
                                 <label><input type="checkbox" name="dockerKey" value="Container" /> Container</label><br />
                                 <label><input type="checkbox" name="dockerKey" value="Name" /> Name</label><br />
@@ -68,21 +99,22 @@
                                 <h3>Theme</h3>
                                 <p>Select your appearance setting:</p>
                                 <div class="theme-options">
-                                    <div class="theme-option" data-theme="light" style="background-color: #FFFFFF;"></div>
-                                    <div class="theme-option" data-theme="dark" style="background-color: #2F3136;"></div>
-                                    <div class="theme-option" data-theme="default" style="background-color: var(--accent);">
+                                    <div class="theme-option light-theme" data-theme="light"></div>
+                                    <div class="theme-option dark-theme" data-theme="dark"></div>
+                                    <div class="theme-option reset-theme" data-theme="default">
                                         <div class="refresh-icon">&#8635;</div>
                                     </div>
                                 </div>
                             </div>
-                            <form id="appearanceForm" style="display: none;">
+                            <form id="appearanceForm">
                                 <input type="hidden" name="theme" value="default">
                             </form>
                         </div>
                     </div>
                     <div class="settingsPanelFooter">
+                        <button id="appApplyButton" class="apply-button">Apply</button>
                         <button id="sshApplyButton" class="apply-button">Apply</button>
-                        <button id="dockerApplyButton" class="apply-button">Apply</button>
+                        <button id="tableApplyButton" class="apply-button">Apply</button>
                         <button id="themeApplyButton" class="apply-button">Apply</button>
                     </div>
                 </div>
