@@ -25,7 +25,7 @@
 </div>
 <div id="mainContent">
     <div id="statsView">
-        <button id="fetchButton">Fetch Docker Stats</button>
+        <button id="playButton">Play</button>
         <div id="statsContainer"></div>
     </div>
     <div id="settingsOverlay" class="overlay">
@@ -84,6 +84,7 @@
                         </div>
                         <div id="settingsTableFields" class="settingsPanel">
                             <form id="keysForm">
+                                <label><input type="checkbox" name="dockerKey" value="ID" /> ID</label><br />
                                 <label><input type="checkbox" name="dockerKey" value="Container" /> Container</label><br />
                                 <label><input type="checkbox" name="dockerKey" value="Name" /> Name</label><br />
                                 <label><input type="checkbox" name="dockerKey" value="CPUPerc" /> CPU %</label><br />

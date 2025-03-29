@@ -1,5 +1,5 @@
 // preload.js
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer} = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
     getShouldUseDarkColors: async () => {
@@ -10,8 +10,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
     getSSHConnections: () => ipcRenderer.invoke('get-ssh-connections'),
-    fetchDockerStats: (connectionInput) => ipcRenderer.invoke('fetch-docker-stats', connectionInput),
+    getDockerApps: (connectionAlias) => ipcRenderer.invoke('get-docker-apps', connectionAlias),
+    startDockerStats: (connectionInput) => ipcRenderer.send('start-docker-stats', connectionInput),
+    stopDockerStats: (connectionInput) => ipcRenderer.send('stop-docker-stats', connectionInput),
     send: (channel, data) => ipcRenderer.send(channel, data),
-    receive: (channel, func) =>
-        ipcRenderer.on(channel, (event, ...args) => func(...args))
+    receive: (channel, func) => ipcRenderer.on(channel, (event, ...args) => func(...args))
 });

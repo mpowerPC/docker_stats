@@ -476,3 +476,7 @@ input[type="checkbox"]:checked::after {
 .error-message {
     color: red;
 }
+
+#playButton {
+    width: 150px;
+}

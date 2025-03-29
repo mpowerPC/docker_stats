@@ -1,4 +1,6 @@
 // renderer.js
+const dockerStatsMap = new Map();
+
 document.getElementById('closeButton').addEventListener('click', () => {
     window.electronAPI.send('close-window');
 });
@@ -30,7 +32,6 @@ document.getElementById('closeSettingsButton').addEventListener('click', () => {
     }
 });
 
-
 document.getElementById('menuSSHConnections').addEventListener('click', () => {
     setActiveTab('ssh');
 });
@@ -47,12 +48,13 @@ document.getElementById('menuApplication').addEventListener('click', () => {
     setActiveTab('application');
 });
 
-document.getElementById('fetchButton').addEventListener('click', async () => {
+let isStreaming = false;
+
+async function startStreaming() {
     let sshSettingsJSON = localStorage.getItem('sshConnectionSettings');
     if (!sshSettingsJSON) {
         return alert("No SSH connection settings found. Please configure connections in Settings.");
     }
-
     let sshSettings;
     try {
         sshSettings = JSON.parse(sshSettingsJSON);
@@ -61,151 +63,220 @@ document.getElementById('fetchButton').addEventListener('click', async () => {
         return alert("Error reading SSH settings.");
     }
 
-    const enabledConnections = Object.keys(sshSettings).filter(host => {
-        return sshSettings[host].useConnectionEnabled === "true";
-    });
-
+    const enabledConnections = Object.keys(sshSettings).filter(host =>
+        sshSettings[host].useConnectionEnabled === "true"
+    );
     if (enabledConnections.length === 0) {
         return alert("No enabled SSH connections found. Please enable one in Settings.");
     }
 
-    const statsContainer = document.getElementById('statsContainer');
-    statsContainer.innerHTML = '';
+    enabledConnections.forEach(host => {
+        const hostSettings = sshSettings[host] || {};
+        const dockerAppsFilter = hostSettings.dockerAppsFilter || [];
+        window.electronAPI.startDockerStats({ hostAlias: host, dockerAppsFilter });
+    });
+}
 
+function stopStreaming() {
+    let sshSettingsJSON = localStorage.getItem('sshConnectionSettings');
+    if (!sshSettingsJSON) return;
+    let sshSettings;
     try {
-        let keysString = localStorage.getItem('dockerKeys');
-        let dockerKeys = [];
-        if (keysString) {
-            try {
-                dockerKeys = JSON.parse(keysString);
-            } catch (parseErr) {
-                console.error("Error parsing docker keys:", parseErr);
-            }
-        }
-
-        const results = await Promise.all(enabledConnections.map(async (host) => {
-            try {
-                const hostSettings = sshSettings[host] || {};
-                const dockerAppsFilter = hostSettings.dockerAppsFilter || [];
-
-                const statsData = await window.electronAPI.fetchDockerStats({
-                    hostAlias: host,
-                    dockerAppsFilter: dockerAppsFilter,
-                });
-
-                const dataObjects = statsData
-                    .split('\n')
-                    .filter(line => line.trim().length)
-                    .map(line => {
-                        try {
-                            return JSON.parse(line);
-                        } catch (parseErr) {
-                            console.error(`Error parsing docker stats JSON for ${host}:`, parseErr);
-                            return null;
-                        }
-                    })
-                    .filter(obj => obj !== null);
-
-                let filteredData = dataObjects;
-                if (dockerKeys.length > 0) {
-                    filteredData = dataObjects.map(obj => {
-                        let filteredObj = {};
-                        dockerKeys.forEach(key => {
-                            if (obj.hasOwnProperty(key)) {
-                                filteredObj[key] = obj[key];
-                            }
-                        });
-                        return filteredObj;
-                    });
-                }
-
-                return { host, data: filteredData };
-            } catch (err) {
-                console.error(`Error fetching stats for ${host}:`, err);
-                return { host, error: err.message };
-            }
-        }));
-
-        results.forEach(result => {
-            const hostHeader = document.createElement('h3');
-            hostHeader.textContent = result.host;
-            statsContainer.appendChild(hostHeader);
-
-            if (result.error) {
-                const errorP = document.createElement('p');
-                errorP.className = "error-message";
-                errorP.textContent = `Error: ${result.error}`;
-                statsContainer.appendChild(errorP);
-            } else if (Array.isArray(result.data) && result.data.length > 0) {
-                const table = document.createElement('table');
-                const keys = Object.keys(result.data[0]);
-                const thead = document.createElement('thead');
-                const headerRow = document.createElement('tr');
-                keys.forEach(key => {
-                    const th = document.createElement('th');
-                    th.textContent = key;
-                    headerRow.appendChild(th);
-                });
-                thead.appendChild(headerRow);
-                table.appendChild(thead);
-
-                const tbody = document.createElement('tbody');
-                result.data.forEach(rowData => {
-                    const row = document.createElement('tr');
-                    keys.forEach(key => {
-                        const td = document.createElement('td');
-                        td.textContent = rowData[key] !== undefined ? rowData[key] : '-';
-                        row.appendChild(td);
-                    });
-                    tbody.appendChild(row);
-                });
-                table.appendChild(tbody);
-                statsContainer.appendChild(table);
-            } else {
-                const noDataP = document.createElement('p');
-                noDataP.textContent = "No matching Docker stats data found.";
-                statsContainer.appendChild(noDataP);
-            }
-        });
+        sshSettings = JSON.parse(sshSettingsJSON);
     } catch (err) {
-        console.error("Error fetching stats from enabled connections:", err);
-        alert("An error occurred while fetching docker stats. Please check the console for details.");
+        console.error("Error parsing SSH settings:", err);
+        return;
+    }
+    const enabledConnections = Object.keys(sshSettings).filter(host =>
+        sshSettings[host].useConnectionEnabled === "true"
+    );
+
+    enabledConnections.forEach(host => {
+        window.electronAPI.stopDockerStats({ hostAlias: host });
+    });
+}
+
+document.getElementById('playButton').addEventListener('click', () => {
+    if (!isStreaming) {
+        startStreaming();
+        isStreaming = true;
+        document.getElementById('playButton').textContent = "Pause";
+    } else {
+        stopStreaming();
+        isStreaming = false;
+        document.getElementById('playButton').textContent = "Play";
     }
 });
 
-window.electronAPI.receive('docker-stats-data', (data) => {
-    const statsContainer = document.getElementById('statsContainer');
-    const keysRaw = localStorage.getItem('dockerKeys');
-    const selectedKeys = keysRaw ? JSON.parse(keysRaw) : [];
-    let stats = [];
-    data.split('\n').forEach(line => {
-        if (line.trim().length) {
-            try {
-                const statObj = JSON.parse(line);
-                stats.push(statObj);
-            } catch (error) {
-                console.error('Error parsing JSON:', error);
+function rebuildDockerStatsTables() {
+    dockerStatsMap.forEach((value, host) => {
+        const hostSection = document.getElementById(`stats-${host}`);
+        if (hostSection) {
+            const oldTable = hostSection.querySelector('table');
+            if (oldTable) {
+                hostSection.removeChild(oldTable);
             }
+            const newEntry = initializeDockerStatsTable(host);
+            dockerStatsMap.set(host, newEntry);
         }
     });
-    statsContainer.innerHTML = '';
-    if (stats.length === 0) {
-        statsContainer.textContent = 'No docker stats to display.';
+}
+
+function initializeDockerStatsTable(host, fields = ["ID", "Container", "Name", "CPUPerc", "MemUsage", "MemPerc", "NetIO", "BlockIO", "PIDs"], formatHeaders = true) {
+    const statsContainer = document.getElementById('statsContainer');
+    if (!statsContainer) {
+        console.error("Stats container not found in the DOM.");
+        return null;
+    }
+
+    let hostSection = document.getElementById(`stats-${host}`);
+    if (!hostSection) {
+        hostSection = document.createElement('div');
+        hostSection.id = `stats-${host}`;
+        const hostHeader = document.createElement('h3');
+        hostHeader.textContent = host;
+        hostSection.appendChild(hostHeader);
+        statsContainer.appendChild(hostSection);
+    } else {
+        const existingTable = hostSection.querySelector('table');
+        if (existingTable) {
+            hostSection.removeChild(existingTable);
+        }
+    }
+
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+
+    fields.forEach(field => {
+        const th = document.createElement('th');
+        let displayField = field;
+        if (formatHeaders) {
+            switch (field) {
+                case "CPUPerc":
+                    displayField = "CPU %";
+                    break;
+                case "MemPerc":
+                    displayField = "MEM %";
+                    break;
+                default:
+                    displayField = field;
+            }
+        }
+        th.textContent = displayField;
+        headerRow.appendChild(th);
+    });
+
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    table.appendChild(tbody);
+
+    hostSection.appendChild(table);
+
+    return { table, tbody };
+}
+
+function updateDockerStatsTable(host, newData, defaultFields = ["ID", "Container", "Name", "CPUPerc", "MemUsage", "MemPerc", "NetIO", "BlockIO", "PIDs"]) {
+    if (!Array.isArray(newData)) {
+        console.warn("newData is not an array. Wrapping it in an array.");
+        newData = [newData];
+    }
+
+    let fields = defaultFields;  // default fallback.
+    const keysString = localStorage.getItem('dockerKeys');
+    if (keysString) {
+        try {
+            const parsedKeys = JSON.parse(keysString);
+            if (Array.isArray(parsedKeys) && parsedKeys.length > 0) {
+                fields = parsedKeys;
+            }
+        } catch (err) {
+            console.error("Error parsing dockerKeys from localStorage:", err);
+        }
+    }
+
+    let tableEntry = dockerStatsMap.get(host);
+    if (!tableEntry || !tableEntry.table) {
+        tableEntry = initializeDockerStatsTable(host, fields);
+        dockerStatsMap.set(host, tableEntry);
+    }
+
+    let tbody = tableEntry.tbody;
+    if (!tbody) {
+        if (tableEntry.table) {
+            tbody = tableEntry.table.querySelector('tbody');
+            if (!tbody) {
+                tbody = document.createElement('tbody');
+                tableEntry.table.appendChild(tbody);
+            }
+        } else {
+            console.error(`Table element is undefined for host: ${host}`);
+            return;
+        }
+        tableEntry.tbody = tbody;
+    }
+
+    tbody.innerHTML = '';
+
+    newData.forEach(dataObj => {
+        const row = document.createElement('tr');
+        fields.forEach(field => {
+            const td = document.createElement('td');
+            td.textContent = dataObj[field] !== undefined ? dataObj[field] : '-';
+            row.appendChild(td);
+        });
+        tbody.appendChild(row);
+    });
+
+    dockerStatsMap.set(host, { table: tableEntry.table, tbody, currentData: newData });
+}
+
+window.electronAPI.receive('docker-stats-update', (update) => {
+    const statsContainer = document.getElementById('statsContainer');
+
+    if (!update.host) {
+        console.error("Update does not include a host.");
         return;
     }
-    const headerKeys = selectedKeys.length ? selectedKeys : Object.keys(stats[0]);
-    let tableHTML = '<table>';
-    tableHTML += '<thead><tr>';
-    headerKeys.forEach(key => tableHTML += `<th>${key}</th>`);
-    tableHTML += '</tr></thead>';
-    tableHTML += '<tbody>';
-    stats.forEach(stat => {
-        tableHTML += '<tr>';
-        headerKeys.forEach(key => tableHTML += `<td>${stat[key] || '-'}</td>`);
-        tableHTML += '</tr>';
-    });
-    tableHTML += '</tbody></table>';
-    statsContainer.innerHTML = tableHTML;
+
+    if (update.error) {
+        let hostSection = document.getElementById(`stats-${update.host}`);
+        if (!hostSection) {
+            hostSection = document.createElement('div');
+            hostSection.id = `stats-${update.host}`;
+            const hostHeader = document.createElement('h3');
+            hostHeader.textContent = update.host;
+            hostSection.appendChild(hostHeader);
+            statsContainer.appendChild(hostSection);
+        }
+        hostSection.querySelectorAll('table').forEach(table => table.remove());
+        const errorP = document.createElement('p');
+        errorP.className = "error-message";
+        errorP.textContent = `Error: ${update.error}`;
+        hostSection.appendChild(errorP);
+        dockerStatsMap.delete(update.host);
+        return;
+    }
+
+    if (update.data.length > 0) {
+        updateDockerStatsTable(update.host, update.data);
+    } else {
+        let hostSection = document.getElementById(`stats-${update.host}`);
+        if (!hostSection) {
+            hostSection = document.createElement('div');
+            hostSection.id = `stats-${update.host}`;
+            const hostHeader = document.createElement('h3');
+            hostHeader.textContent = update.host;
+            hostSection.appendChild(hostHeader);
+            statsContainer.appendChild(hostSection);
+        }
+        hostSection.querySelectorAll('table').forEach(table => table.remove());
+        const noDataP = document.createElement('p');
+        noDataP.textContent = "No matching Docker stats data found.";
+        hostSection.appendChild(noDataP);
+    }
 });
 
 window.electronAPI.receive('docker-stats-error', (errorMessage) => {
@@ -411,6 +482,7 @@ document.getElementById('sshApplyButton').addEventListener('click', () => {
     };
 
     localStorage.setItem('sshConnectionSettings', JSON.stringify(sshSettings));
+
 });
 
 function updateTableFields() {
@@ -435,6 +507,7 @@ document.getElementById('tableApplyButton').addEventListener('click', (e) => {
     const selectedKeys = Array.from(document.querySelectorAll('input[name="dockerKey"]:checked'))
         .map(checkbox => checkbox.value);
     localStorage.setItem('dockerKeys', JSON.stringify(selectedKeys));
+    rebuildDockerStatsTables();
 });
 
 const themeOptions = document.querySelectorAll('.theme-option');

@@ -21,51 +21,67 @@ function createMainWindow() {
     mainWindow.setMenu(null);
 }
 
-ipcMain.handle('fetch-docker-stats', async (event, { hostAlias, dockerAppsFilter }) => {
-    if (!hostAlias || typeof hostAlias !== 'string') {
-        throw new Error('Invalid host alias.');
-    }
+const activeDockerStreams = {};
 
+ipcMain.on('start-docker-stats', (event, { hostAlias, dockerAppsFilter }) => {
+    if (!hostAlias || typeof hostAlias !== 'string') {
+        event.sender.send('docker-stats-update', { host: hostAlias, error: 'Invalid host alias.' });
+        return;
+    }
     let connectionData;
     try {
         connectionData = getSSHConfigForAlias(hostAlias);
     } catch (err) {
-        throw new Error(err.message);
+        event.sender.send('docker-stats-update', { host: hostAlias, error: err.message });
+        return;
     }
-
-    return new Promise((resolve, reject) => {
-        const client = new Client();
-        client.on('ready', () => {
-            let cmd = 'docker stats --no-stream --format "{{json .}}"';
-            if (Array.isArray(dockerAppsFilter) && dockerAppsFilter.length > 0) {
-                cmd = `docker stats ${dockerAppsFilter.join(' ')} --no-stream --format "{{json .}}"`;
+    const client = new Client();
+    client.on('ready', () => {
+        let cmd = 'docker stats --format "{{json .}}"';
+        if (Array.isArray(dockerAppsFilter) && dockerAppsFilter.length > 0) {
+            cmd = `docker stats ${dockerAppsFilter.join(' ')} --format "{{json .}}"`;
+        }
+        client.exec(cmd, (err, stream) => {
+            if (err) {
+                client.end();
+                event.sender.send('docker-stats-update', { host: hostAlias, error: err.message });
+                return;
             }
-
-            client.exec(cmd, (err, stream) => {
-                if (err) {
-                    client.end();
-                    return reject(err.message);
+            activeDockerStreams[hostAlias] = client;
+            stream.on('data', (data) => {
+                const lines = data.toString().split('\n').filter(line => line.trim().length > 0);
+                let parsedUpdates = [];
+                lines.forEach(line => {
+                    try {
+                        if (line.trim().length > 25) {
+                            const parsed = JSON.parse(line);
+                            parsedUpdates.push(parsed);
+                        }
+                    } catch (e) {
+                        console.error(`Error parsing docker stats JSON for ${hostAlias}:`, e);
+                    }
+                });
+                if (parsedUpdates.length > 0) {
+                    event.sender.send('docker-stats-update', { host: hostAlias, data: parsedUpdates });
                 }
-                let dataBuffer = '';
-                stream.on('data', (data) => {
-                    dataBuffer += data.toString();
-                });
-                stream.stderr.on('data', (data) => {
-                    console.error(`STDERR: ${data}`);
-                });
-                stream.on('close', () => {
-                    client.end();
-                    resolve(dataBuffer);
-                });
+            });
+            stream.on('close', () => {
+                client.end();
+                delete activeDockerStreams[hostAlias];
             });
         });
-
-        client.on('error', err => {
-            reject(err.message);
-        });
-
-        client.connect(connectionData);
     });
+    client.on('error', err => {
+        event.sender.send('docker-stats-update', { host: hostAlias, error: err.message });
+    });
+    client.connect(connectionData);
+});
+
+ipcMain.on('stop-docker-stats', (event, { hostAlias }) => {
+    if (activeDockerStreams[hostAlias]) {
+        activeDockerStreams[hostAlias].end();
+        delete activeDockerStreams[hostAlias];
+    }
 });
 
 ipcMain.handle('get-ssh-connections', async () => {
