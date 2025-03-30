@@ -496,15 +496,19 @@ document.getElementById('themeApplyButton').addEventListener('click', () => {
     }
 });
 
-document.addEventListener("DOMContentLoaded", () => {
-    initTheme();
-    updateTableFields(true);
-});
+function initTableFontSize() {
+    window.myStore.get('tableFontSize', '14').then(tableFontSize => {
+        if (tableFontSize !== '14') {
+            document.getElementById('statsContainer').style.fontSize = tableFontSize + 'px';
+        }
+    });
+}
 
 document.getElementById('statsContainer').addEventListener('wheel', (e) => {
+    const statsContainer = e.currentTarget;
     if (e.ctrlKey) {
         e.preventDefault();
-        const currentFontSize = parseFloat(window.getComputedStyle(document.getElementById('statsContainer')).fontSize);
+        const currentFontSize = parseFloat(window.getComputedStyle(statsContainer).fontSize);
         const step = 1;
         let newFontSize;
         if (e.deltaY < 0) {
@@ -514,5 +518,12 @@ document.getElementById('statsContainer').addEventListener('wheel', (e) => {
         }
         newFontSize = Math.max(10, Math.min(newFontSize, 30));
         statsContainer.style.fontSize = newFontSize + 'px';
+        window.myStore.set('tableFontSize', newFontSize).then();
     }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    initTheme();
+    updateTableFields(true);
+    initTableFontSize();
 });
