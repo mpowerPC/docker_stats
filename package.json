@@ -2,6 +2,7 @@
   "name": "docker_stats",
   "version": "0.6.0",
   "main": "main.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "electron .",
@@ -11,8 +12,11 @@
   "author": "",
   "license": "ISC",
   "description": "A remote program tto view docker stats.",
-  "dependencies": {
+  "devDependencies": {
     "electron": "^35.1.2",
+    "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
     "electron-store": "^10.0.1",
     "ssh-config": "^5.0.3",
     "ssh2": "^1.16.0"
@@ -30,9 +34,10 @@
       "renderer.js",
       "style.css",
       "sshConfigHelper.js",
-      "manage.js",
-      "manage.html",
       "package.json"
+    ],
+    "asarUnpack": [
+      "**/node_modules/electron-store/**"
     ],
     "extraMetadata": {
       "main": "main.js"

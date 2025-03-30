@@ -274,7 +274,7 @@ document.getElementById('appApplyButton').addEventListener('click', (e) => {
     e.preventDefault();
     const startupCheckbox = document.getElementById('startupCheckbox');
     const startupBehavior = startupCheckbox.checked ? "true" : "false";
-    window.myStore.set('startupBehavior', startupBehavior).then(() => {});
+    window.myStore.set('startupBehavior', startupBehavior).then();
 });
 
 function populateSSHDropdown() {
@@ -436,7 +436,6 @@ document.getElementById('tableApplyButton').addEventListener('click', (e) => {
     const tableFields = Array.from(document.querySelectorAll('input[name="tableField"]:checked'))
         .map(checkbox => checkbox.value);
 
-    console.log(tableFields);
     window.myStore.set('tableFields', JSON.stringify(tableFields)).then(() => {
         savedFields = tableFields;
         rebuildDockerStatsTables();
@@ -503,7 +502,6 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 document.getElementById('statsContainer').addEventListener('wheel', (e) => {
-    console.log('wheel', e);
     if (e.ctrlKey) {
         e.preventDefault();
         const currentFontSize = parseFloat(window.getComputedStyle(document.getElementById('statsContainer')).fontSize);

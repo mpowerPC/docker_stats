@@ -1,40 +1,46 @@
-const { app, BrowserWindow, ipcMain, nativeTheme } = require('electron');
-const path = require('path');
-const { Client } = require('ssh2');
-const { getAllSSHConnections, getSSHConfigForAlias } = require('./sshConfigHelper');
-const Store = require('electron-store').default || require('electron-store');
+// main.js
+import { app, BrowserWindow, ipcMain, nativeTheme, globalShortcut } from 'electron';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { Client } from 'ssh2';
+import Store from 'electron-store';
+import { getAllSSHConnections, getSSHConfigForAlias } from './sshConfigHelper.js';
 
-let mainWindow;
-let ssh;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const store = new Store();
 const activeDockerStreams = {};
+let mainWindow;
+let ssh;
 
+function saveBounds() {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        store.set('windowBounds', mainWindow.getBounds());
+    }
+}
+  
 function createMainWindow() {
     const savedBounds = store.get('windowBounds') || { width: 800, height: 600 };
-
+  
     mainWindow = new BrowserWindow({
-        width: savedBounds.width,
-        height: savedBounds.height,
-        minHeight: 40,
-        minWidth: 250,
-        frame: false,
-        webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
-            contextIsolation: true,
-            nodeIntegration: false,
-        },
+      width: savedBounds.width,
+      height: savedBounds.height,
+      minHeight: 40,
+      minWidth: 250,
+      frame: false,
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
     });
+  
     mainWindow.loadFile('index.html');
     mainWindow.setMenu(null);
 
-    function saveBounds() {
-        if (!mainWindow.isDestroyed()) {
-            store.set('windowBounds', mainWindow.getBounds());
-        }
-    }
-
     mainWindow.on('resize', saveBounds);
     mainWindow.on('move', saveBounds);
+    mainWindow.on('close', saveBounds);
 }
 
 ipcMain.handle('store-get', (event, key, defaultValue) => {
@@ -214,9 +220,18 @@ app.on('window-all-closed', () => {
 
 app.whenReady().then(() => {
     createMainWindow();
-    if (process.env.NODE_ENV === 'development') {
-        mainWindow.webContents.openDevTools();
-    }
+
+    globalShortcut.register('CommandOrControl+Shift+I', () => {
+        if (mainWindow) {
+          const isVisible = mainWindow.webContents.isDevToolsOpened();
+          if (isVisible) {
+            mainWindow.webContents.closeDevTools();
+          } else {
+            mainWindow.webContents.openDevTools();
+          }
+        }
+      });
+    
 }).catch((error) => {
     console.error('Error during app initialization:', error);
 });

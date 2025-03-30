@@ -1,9 +1,10 @@
 // sshConfigHelper.js
-const fs = require('fs');
-const path = require('path');
-const SSHConfig = require('ssh-config');
+import fs from 'fs';
+import path from 'path';
+import SSHConfig from 'ssh-config';
 
-function getSSHConfigForAlias(hostAlias) {
+
+export function getSSHConfigForAlias(hostAlias) {
     const homeDir = process.env.HOME || process.env.USERPROFILE;
     const configPath = path.join(homeDir, '.ssh', 'config');
 
@@ -43,7 +44,7 @@ function getSSHConfigForAlias(hostAlias) {
     };
 }
 
-function getAllSSHConnections() {
+export function getAllSSHConnections() {
     const homeDir = process.env.HOME || process.env.USERPROFILE;
     const configPath = path.join(homeDir, '.ssh', 'config');
 
@@ -93,8 +94,3 @@ function getAllSSHConnections() {
 
     return hosts;
 }
-
-module.exports = {
-    getSSHConfigForAlias,
-    getAllSSHConnections,
-};
