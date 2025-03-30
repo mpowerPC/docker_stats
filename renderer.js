@@ -1,5 +1,6 @@
 // renderer.js
-const dockerStatsMap = new Map();
+let isStreaming = false;
+let savedFields = [];
 
 document.getElementById('closeButton').addEventListener('click', () => {
     window.electronAPI.send('close-window');
@@ -48,240 +49,178 @@ document.getElementById('menuApplication').addEventListener('click', () => {
     setActiveTab('application');
 });
 
-let isStreaming = false;
-
 async function startStreaming() {
-    let sshSettingsJSON = localStorage.getItem('sshConnectionSettings');
-    if (!sshSettingsJSON) {
-        return alert("No SSH connection settings found. Please configure connections in Settings.");
-    }
-    let sshSettings;
-    try {
-        sshSettings = JSON.parse(sshSettingsJSON);
-    } catch (err) {
-        console.error("Error parsing SSH settings:", err);
-        return alert("Error reading SSH settings.");
-    }
+    let sshSettings = {};
+    window.myStore.get('sshConnectionSettings', '{}').then(storedStartupBehavior => {
+        if (storedStartupBehavior !== '{}') {
+            try {
+                sshSettings = JSON.parse(storedStartupBehavior);
+            } catch (e) {
+                console.error("Error parsing SSH settings:", e);
+            }
+        }
 
-    const enabledConnections = Object.keys(sshSettings).filter(host =>
-        sshSettings[host].useConnectionEnabled === "true"
-    );
-    if (enabledConnections.length === 0) {
-        return alert("No enabled SSH connections found. Please enable one in Settings.");
-    }
+        const enabledConnections = Object.keys(sshSettings).filter(host =>
+            sshSettings[host].useConnectionEnabled === "true"
+        );
+        if (enabledConnections.length === 0) {
+            return alert("No enabled SSH connections found. Please enable one in Settings.");
+        }
 
-    enabledConnections.forEach(host => {
-        const hostSettings = sshSettings[host] || {};
-        const dockerAppsFilter = hostSettings.dockerAppsFilter || [];
-        window.electronAPI.startDockerStats({ hostAlias: host, dockerAppsFilter });
+        enabledConnections.forEach(host => {
+            const hostSettings = sshSettings[host] || {};
+            const dockerAppsFilter = hostSettings.dockerAppsFilter || [];
+            window.electronAPI.startDockerStats({hostAlias: host, dockerAppsFilter: dockerAppsFilter, tableFields: savedFields});
+        });
     });
 }
 
 function stopStreaming() {
-    let sshSettingsJSON = localStorage.getItem('sshConnectionSettings');
-    if (!sshSettingsJSON) return;
-    let sshSettings;
-    try {
-        sshSettings = JSON.parse(sshSettingsJSON);
-    } catch (err) {
-        console.error("Error parsing SSH settings:", err);
-        return;
-    }
-    const enabledConnections = Object.keys(sshSettings).filter(host =>
-        sshSettings[host].useConnectionEnabled === "true"
-    );
+    let sshSettings = {};
+    window.myStore.get('sshConnectionSettings', '{}').then(storedStartupBehavior => {
+        if (storedStartupBehavior !== '{}') {
+            try {
+                sshSettings = JSON.parse(storedStartupBehavior);
+            } catch (e) {
+                console.error("Error parsing SSH settings:", e);
+            }
+        }
+        const enabledConnections = Object.keys(sshSettings).filter(host =>
+            sshSettings[host].useConnectionEnabled === "true"
+        );
 
-    enabledConnections.forEach(host => {
-        window.electronAPI.stopDockerStats({ hostAlias: host });
+        enabledConnections.forEach(host => {
+            window.electronAPI.stopDockerStats({ hostAlias: host });
+        });
     });
 }
 
 document.getElementById('playButton').addEventListener('click', () => {
     if (!isStreaming) {
-        startStreaming();
-        isStreaming = true;
-        document.getElementById('playButton').textContent = "Pause";
+        startStreaming().then(() => {
+            isStreaming = true;
+            document.getElementById('playButton').innerHTML = '||';
+        });
     } else {
         stopStreaming();
         isStreaming = false;
-        document.getElementById('playButton').textContent = "Play";
+        document.getElementById('playButton').innerHTML = '▶';
     }
 });
 
-function rebuildDockerStatsTables() {
-    dockerStatsMap.forEach((value, host) => {
-        const hostSection = document.getElementById(`stats-${host}`);
-        if (hostSection) {
-            const oldTable = hostSection.querySelector('table');
-            if (oldTable) {
-                hostSection.removeChild(oldTable);
+window.electronAPI.receive('docker-stats-update', (update) => {
+    if (update.error || update.data.length === 0) {
+        return;
+    }
+    updateDockerStatsTable(update.host, update.data);
+});
+
+function updateDockerStatsTable(host, newData) {
+    const statsContainer = document.getElementById('statsContainer');
+    let table = statsContainer.getElementsByTagName("table")
+    if (!table[0]) {
+        initializeDockerStatsTable();
+        table = statsContainer.getElementsByTagName("table")
+    }
+
+    let tbody = table[0].getElementsByTagName("tbody");
+    tbody = tbody[0];
+    if (tbody.rows.length === 0) {
+        createHostRows(host, newData, tbody);
+    } else {
+        let exists = false
+        for (const row of tbody.rows) {
+            if (row.dataset.host === host) {
+                exists = true;
+                break;
             }
-            const newEntry = initializeDockerStatsTable(host);
-            dockerStatsMap.set(host, newEntry);
         }
-    });
+
+        if (!exists) {
+            createHostRows(host, newData, tbody);
+        } else {
+            let i = 0;
+            for (const row of tbody.rows) {
+                if (row.dataset.host === host) {
+                    if (i !== 0) {
+                        let j = 0;
+                        const cells = row.cells;
+                        savedFields.forEach(field => {
+                            cells[j].textContent = newData[i - 1][field] !== undefined ? newData[i - 1][field] : '-';
+                            j++;
+                        });
+                    }
+                    i++;
+                }
+            }
+        }
+    }
 }
 
-function initializeDockerStatsTable(host, fields = ["ID", "Container", "Name", "CPUPerc", "MemUsage", "MemPerc", "NetIO", "BlockIO", "PIDs"], formatHeaders = true) {
+function initializeDockerStatsTable() {
     const statsContainer = document.getElementById('statsContainer');
-    if (!statsContainer) {
-        console.error("Stats container not found in the DOM.");
-        return null;
-    }
 
-    let hostSection = document.getElementById(`stats-${host}`);
-    if (!hostSection) {
-        hostSection = document.createElement('div');
-        hostSection.id = `stats-${host}`;
-        const hostHeader = document.createElement('h3');
-        hostHeader.textContent = host;
-        hostSection.appendChild(hostHeader);
-        statsContainer.appendChild(hostSection);
-    } else {
-        const existingTable = hostSection.querySelector('table');
-        if (existingTable) {
-            hostSection.removeChild(existingTable);
-        }
-    }
+    statsContainer.innerHTML = '';
 
     const table = document.createElement('table');
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-
-    fields.forEach(field => {
+    savedFields.forEach(field => {
         const th = document.createElement('th');
-        let displayField = field;
-        if (formatHeaders) {
-            switch (field) {
-                case "CPUPerc":
-                    displayField = "CPU %";
-                    break;
-                case "MemPerc":
-                    displayField = "MEM %";
-                    break;
-                default:
-                    displayField = field;
-            }
-        }
-        th.textContent = displayField;
+        th.textContent = field;
         headerRow.appendChild(th);
     });
-
     thead.appendChild(headerRow);
     table.appendChild(thead);
 
     const tbody = document.createElement('tbody');
     table.appendChild(tbody);
 
-    hostSection.appendChild(table);
-
-    return { table, tbody };
+    statsContainer.appendChild(table);
 }
 
-function updateDockerStatsTable(host, newData, defaultFields = ["ID", "Container", "Name", "CPUPerc", "MemUsage", "MemPerc", "NetIO", "BlockIO", "PIDs"]) {
-    if (!Array.isArray(newData)) {
-        console.warn("newData is not an array. Wrapping it in an array.");
-        newData = [newData];
-    }
+function createHostRows(host, newData, tbody) {
+    let row = document.createElement('tr');
+    let td = document.createElement('td');
 
-    let fields = defaultFields;  // default fallback.
-    const keysString = localStorage.getItem('dockerKeys');
-    if (keysString) {
-        try {
-            const parsedKeys = JSON.parse(keysString);
-            if (Array.isArray(parsedKeys) && parsedKeys.length > 0) {
-                fields = parsedKeys;
-            }
-        } catch (err) {
-            console.error("Error parsing dockerKeys from localStorage:", err);
-        }
-    }
-
-    let tableEntry = dockerStatsMap.get(host);
-    if (!tableEntry || !tableEntry.table) {
-        tableEntry = initializeDockerStatsTable(host, fields);
-        dockerStatsMap.set(host, tableEntry);
-    }
-
-    let tbody = tableEntry.tbody;
-    if (!tbody) {
-        if (tableEntry.table) {
-            tbody = tableEntry.table.querySelector('tbody');
-            if (!tbody) {
-                tbody = document.createElement('tbody');
-                tableEntry.table.appendChild(tbody);
-            }
-        } else {
-            console.error(`Table element is undefined for host: ${host}`);
-            return;
-        }
-        tableEntry.tbody = tbody;
-    }
-
-    tbody.innerHTML = '';
+    td.colSpan = savedFields.length;
+    td.style.textAlign = 'center';
+    td.style.fontWeight = 'bold';
+    td.textContent = host;
+    row.appendChild(td);
+    row.dataset.host = host;
+    tbody.appendChild(row);
 
     newData.forEach(dataObj => {
-        const row = document.createElement('tr');
-        fields.forEach(field => {
-            const td = document.createElement('td');
+        row = document.createElement('tr');
+        row.dataset.host = host;
+        savedFields.forEach(field => {
+            td = document.createElement('td');
             td.textContent = dataObj[field] !== undefined ? dataObj[field] : '-';
             row.appendChild(td);
         });
         tbody.appendChild(row);
     });
-
-    dockerStatsMap.set(host, { table: tableEntry.table, tbody, currentData: newData });
 }
 
-window.electronAPI.receive('docker-stats-update', (update) => {
-    const statsContainer = document.getElementById('statsContainer');
+function rebuildDockerStatsTables() {
+    const lastStreamingSetting = isStreaming;
 
-    if (!update.host) {
-        console.error("Update does not include a host.");
-        return;
+    if (isStreaming) {
+        stopStreaming();
+        isStreaming = false;
+        document.getElementById('playButton').innerHTML = '▶';
     }
 
-    if (update.error) {
-        let hostSection = document.getElementById(`stats-${update.host}`);
-        if (!hostSection) {
-            hostSection = document.createElement('div');
-            hostSection.id = `stats-${update.host}`;
-            const hostHeader = document.createElement('h3');
-            hostHeader.textContent = update.host;
-            hostSection.appendChild(hostHeader);
-            statsContainer.appendChild(hostSection);
-        }
-        hostSection.querySelectorAll('table').forEach(table => table.remove());
-        const errorP = document.createElement('p');
-        errorP.className = "error-message";
-        errorP.textContent = `Error: ${update.error}`;
-        hostSection.appendChild(errorP);
-        dockerStatsMap.delete(update.host);
-        return;
-    }
+    initializeDockerStatsTable();
 
-    if (update.data.length > 0) {
-        updateDockerStatsTable(update.host, update.data);
-    } else {
-        let hostSection = document.getElementById(`stats-${update.host}`);
-        if (!hostSection) {
-            hostSection = document.createElement('div');
-            hostSection.id = `stats-${update.host}`;
-            const hostHeader = document.createElement('h3');
-            hostHeader.textContent = update.host;
-            hostSection.appendChild(hostHeader);
-            statsContainer.appendChild(hostSection);
-        }
-        hostSection.querySelectorAll('table').forEach(table => table.remove());
-        const noDataP = document.createElement('p');
-        noDataP.textContent = "No matching Docker stats data found.";
-        hostSection.appendChild(noDataP);
+    if (lastStreamingSetting) {
+        startStreaming().then(() => {
+            isStreaming = true;
+            document.getElementById('playButton').innerHTML = '||';
+        });
     }
-});
-
-window.electronAPI.receive('docker-stats-error', (errorMessage) => {
-    document.getElementById('statsContainer').textContent = `Error: ${errorMessage}`;
-});
+}
 
 function setActiveTab(tab) {
     document.querySelectorAll('.settingsMenu .menuItem').forEach(item => {
@@ -326,25 +265,21 @@ function setActiveTab(tab) {
 
 function updateApplicationSettingsUI() {
     const startupCheckbox = document.getElementById('startupCheckbox');
-    const storedStartupBehavior = localStorage.getItem('startupBehavior');
-    startupCheckbox.checked = storedStartupBehavior === 'true';
+    window.myStore.get('startupBehavior', 'false').then(storedStartupBehavior => {
+        startupCheckbox.checked = storedStartupBehavior === 'true';
+    });
 }
 
 document.getElementById('appApplyButton').addEventListener('click', (e) => {
     e.preventDefault();
     const startupCheckbox = document.getElementById('startupCheckbox');
     const startupBehavior = startupCheckbox.checked ? "true" : "false";
-    localStorage.setItem('startupBehavior', startupBehavior);
+    window.myStore.set('startupBehavior', startupBehavior).then(() => {});
 });
 
 function populateSSHDropdown() {
     window.electronAPI.getSSHConnections().then(hosts => {
         const dropdown = document.getElementById('sshDropdown');
-        if (!dropdown) {
-            console.error('SSH dropdown element not found.');
-            return;
-        }
-
         dropdown.innerHTML = '';
 
         if (!hosts || hosts.length === 0) {
@@ -362,20 +297,14 @@ function populateSSHDropdown() {
             dropdown.appendChild(option);
         });
 
-        let activeConn = localStorage.getItem('activeConnection');
-        if (!activeConn || !hosts.includes(activeConn)) {
-            activeConn = hosts[0];
-            localStorage.setItem('activeConnection', activeConn);
-        }
-        dropdown.value = activeConn;
+        const selectedHost = hosts[0];
+        dropdown.value = selectedHost;
 
         const currentConnElem = document.getElementById('currentSSHConnection');
         if (currentConnElem) {
-            currentConnElem.textContent = activeConn;
-            updateConnectionSettings(activeConn);
-        } else {
-            console.warn('Current SSH connection display element not found.');
+            currentConnElem.textContent = selectedHost;
         }
+        updateConnectionSettings(selectedHost);
     }).catch(err => {
         console.error("Error fetching SSH connections:", err);
     });
@@ -383,19 +312,11 @@ function populateSSHDropdown() {
 
 document.getElementById('sshDropdown').addEventListener('change', () => {
     const dropdown = document.getElementById('sshDropdown');
-    if (!dropdown) {
-        console.error('SSH dropdown element not found.');
-        return;
-    }
     const selectedHost = dropdown.value;
-
     const currentConnElem = document.getElementById('currentSSHConnection');
     if (currentConnElem) {
         currentConnElem.textContent = selectedHost;
-    } else {
-        console.warn('Current SSH connection display element not found.');
     }
-
     updateConnectionSettings(selectedHost);
 });
 
@@ -405,52 +326,52 @@ function updateConnectionSettings(selectedHost) {
         return;
     }
 
-    let sshSettings = localStorage.getItem('sshConnectionSettings');
-    if (sshSettings) {
-        try {
-            sshSettings = JSON.parse(sshSettings);
-        } catch (e) {
-            console.error("Error parsing SSH settings:", e);
-            sshSettings = {};
-        }
-    } else {
-        sshSettings = {};
-    }
-
-    const hostSettings = sshSettings[selectedHost] || {};
-    const useConnCheckbox = document.getElementById('useConnectionCheckbox');
-    useConnCheckbox.checked = hostSettings.useConnectionEnabled === "true";
-
-    window.electronAPI.getDockerApps(selectedHost).then(result => {
-        const dockerAppsGrid = document.getElementById('dockerAppsGrid');
-        dockerAppsGrid.innerHTML = '';
-
-        if (result.error) {
-            useConnCheckbox.checked = false;
-            useConnCheckbox.disabled = true;
-            dockerAppsGrid.innerHTML = `<p class="error-message">Unable to fetch Docker apps: ${result.error}</p>`;
-        } else if (Array.isArray(result)) {
-            useConnCheckbox.disabled = false;
-            result.forEach(appName => {
-                const appDiv = document.createElement('div');
-                appDiv.className = 'docker-app-item';
-                appDiv.textContent = appName;
-                appDiv.addEventListener('click', () => {
-                    appDiv.classList.toggle('selected');
-                });
-                dockerAppsGrid.appendChild(appDiv);
-            });
-
-            if (hostSettings.dockerAppsFilter && Array.isArray(hostSettings.dockerAppsFilter)) {
-                Array.from(dockerAppsGrid.children).forEach(appEl => {
-                    if (hostSettings.dockerAppsFilter.includes(appEl.textContent)) {
-                        appEl.classList.add('selected');
-                    }
-                });
+    let sshSettings = {};
+    window.myStore.get('sshConnectionSettings', '{}').then(storedStartupBehavior => {
+        if (storedStartupBehavior !== '{}') {
+            try {
+                sshSettings = JSON.parse(storedStartupBehavior);
+            } catch (e) {
+                console.error("Error parsing SSH settings:", e);
+                sshSettings = {};
             }
         }
-    }).catch(err => {
-        console.error("Error fetching Docker apps:", err);
+
+        const hostSettings = sshSettings[selectedHost] || {};
+        const useConnCheckbox = document.getElementById('useConnectionCheckbox');
+        useConnCheckbox.checked = hostSettings.useConnectionEnabled === "true";
+
+        window.electronAPI.getDockerApps(selectedHost).then(result => {
+            const dockerAppsGrid = document.getElementById('dockerAppsGrid');
+            dockerAppsGrid.innerHTML = '';
+
+            if (result.error) {
+                useConnCheckbox.checked = false;
+                useConnCheckbox.disabled = true;
+                dockerAppsGrid.innerHTML = `<p class="error-message">Unable to fetch Docker apps: ${result.error}</p>`;
+            } else if (Array.isArray(result)) {
+                useConnCheckbox.disabled = false;
+                result.forEach(appName => {
+                    const appDiv = document.createElement('div');
+                    appDiv.className = 'docker-app-item';
+                    appDiv.textContent = appName;
+                    appDiv.addEventListener('click', () => {
+                        appDiv.classList.toggle('selected');
+                    });
+                    dockerAppsGrid.appendChild(appDiv);
+                });
+
+                if (hostSettings.dockerAppsFilter && Array.isArray(hostSettings.dockerAppsFilter)) {
+                    Array.from(dockerAppsGrid.children).forEach(appEl => {
+                        if (hostSettings.dockerAppsFilter.includes(appEl.textContent)) {
+                            appEl.classList.add('selected');
+                        }
+                    });
+                }
+            }
+        }).catch(err => {
+            console.error("Error fetching Docker apps:", err);
+        });
     });
 }
 
@@ -464,50 +385,62 @@ document.getElementById('sshApplyButton').addEventListener('click', () => {
     const useConnCheckbox = document.getElementById('useConnectionCheckbox');
     const useConnectionEnabled = useConnCheckbox.checked ? "true" : "false";
 
-    let sshSettings = localStorage.getItem('sshConnectionSettings');
-    if (sshSettings) {
-        try {
-            sshSettings = JSON.parse(sshSettings);
-        } catch (e) {
-            console.error("Error parsing existing SSH settings:", e);
-            sshSettings = {};
+    let sshSettings = {};
+    window.myStore.get('sshConnectionSettings', '{}').then(storedStartupBehavior => {
+        if (storedStartupBehavior !== '{}') {
+            try {
+                sshSettings = JSON.parse(storedStartupBehavior);
+            } catch (e) {
+                console.error("Error parsing SSH settings:", e);
+                sshSettings = {};
+            }
         }
-    } else {
-        sshSettings = {};
-    }
 
-    sshSettings[selectedHost] = {
-        useConnectionEnabled: useConnectionEnabled,
-        dockerAppsFilter: selectedApps
-    };
+        sshSettings[selectedHost] = {
+            useConnectionEnabled: useConnectionEnabled,
+            dockerAppsFilter: selectedApps
+        };
 
-    localStorage.setItem('sshConnectionSettings', JSON.stringify(sshSettings));
-
+        window.myStore.set('sshConnectionSettings', JSON.stringify(sshSettings)).then(() => {
+            rebuildDockerStatsTables();
+        });
+    });
 });
 
-function updateTableFields() {
-    const keysString = localStorage.getItem('dockerKeys');
-    let savedKeys = [];
-    if (keysString) {
-        try {
-            savedKeys = JSON.parse(keysString);
-        } catch (err) {
-            console.error("Error parsing saved Docker keys:", err);
+function updateTableFields(onLoad = false) {
+    window.myStore.get('tableFields', '[]').then(tableFields => {
+        if (tableFields !== '[]') {
+            try {
+                savedFields = JSON.parse(tableFields);
+            } catch (e) {
+                console.error("Error parsing tableFields:", e);
+                savedFields = [];
+            }
+        } else {
+            savedFields = [];
         }
-    }
 
-    [...document.querySelectorAll('input[name="dockerKey"]')].forEach(checkbox => {
-        checkbox.checked = savedKeys.includes(checkbox.value);
+        [...document.querySelectorAll('input[name="tableField"]')].forEach(checkbox => {
+            checkbox.checked = savedFields.includes(checkbox.value);
+        });
+
+        if (onLoad) {
+            rebuildDockerStatsTables();
+        }
     });
 }
 
 document.getElementById('tableApplyButton').addEventListener('click', (e) => {
     e.preventDefault();
 
-    const selectedKeys = Array.from(document.querySelectorAll('input[name="dockerKey"]:checked'))
+    const tableFields = Array.from(document.querySelectorAll('input[name="tableField"]:checked'))
         .map(checkbox => checkbox.value);
-    localStorage.setItem('dockerKeys', JSON.stringify(selectedKeys));
-    rebuildDockerStatsTables();
+
+    console.log(tableFields);
+    window.myStore.set('tableFields', JSON.stringify(tableFields)).then(() => {
+        savedFields = tableFields;
+        rebuildDockerStatsTables();
+    });
 });
 
 const themeOptions = document.querySelectorAll('.theme-option');
@@ -530,15 +463,16 @@ function updateAppearanceSelection(currentTheme) {
 }
 
 function initTheme() {
-    let storedTheme = localStorage.getItem('theme');
-    if (!storedTheme) {
-        storedTheme = window.electronAPI.getShouldUseDarkColors() ? 'dark' : 'light';
-    }
-    document.documentElement.setAttribute('data-theme', storedTheme);
-    updateAppearanceSelection(storedTheme);
+    window.myStore.get('theme', '').then(storedTheme => {
+        window.electronAPI.getShouldUseDarkColors().then(isDark => {
+            if (!storedTheme) {
+                storedTheme = isDark ? 'dark' : 'light';
+            }
+            document.documentElement.setAttribute('data-theme', storedTheme);
+            updateAppearanceSelection(storedTheme);
+        });
+    });
 }
-
-document.addEventListener("DOMContentLoaded", initTheme);
 
 document.getElementById('themeApplyButton').addEventListener('click', () => {
     const hiddenInput = document.querySelector('#appearanceForm input[name="theme"]');
@@ -546,20 +480,41 @@ document.getElementById('themeApplyButton').addEventListener('click', () => {
 
     if (selectedTheme) {
         if (selectedTheme === "default") {
-            localStorage.removeItem('theme');
-            window.electronAPI.getShouldUseDarkColors()
-                .then(isDark => {
+            window.myStore.set('theme', "").then(() => {
+                window.electronAPI.getShouldUseDarkColors().then(isDark => {
                     const systemTheme = isDark ? 'dark' : 'light';
                     document.documentElement.setAttribute('data-theme', systemTheme);
                     updateAppearanceSelection(systemTheme);
-                })
-                .catch(err => {
-                    console.error("Error getting system theme:", err);
                 });
+            });
+
         } else {
-            localStorage.setItem('theme', selectedTheme);
-            document.documentElement.setAttribute('data-theme', selectedTheme);
-            updateAppearanceSelection(selectedTheme);
+            window.myStore.set('theme', selectedTheme).then(() => {
+                document.documentElement.setAttribute('data-theme', selectedTheme);
+                updateAppearanceSelection(selectedTheme);
+            });
         }
+    }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    initTheme();
+    updateTableFields(true);
+});
+
+document.getElementById('statsContainer').addEventListener('wheel', (e) => {
+    console.log('wheel', e);
+    if (e.ctrlKey) {
+        e.preventDefault();
+        const currentFontSize = parseFloat(window.getComputedStyle(document.getElementById('statsContainer')).fontSize);
+        const step = 1;
+        let newFontSize;
+        if (e.deltaY < 0) {
+            newFontSize = currentFontSize + step;
+        } else {
+            newFontSize = currentFontSize - step;
+        }
+        newFontSize = Math.max(10, Math.min(newFontSize, 30));
+        statsContainer.style.fontSize = newFontSize + 'px';
     }
 });

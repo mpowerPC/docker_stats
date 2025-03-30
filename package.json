@@ -1,6 +1,6 @@
 {
   "name": "docker_stats",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -13,6 +13,7 @@
   "description": "A remote program tto view docker stats.",
   "dependencies": {
     "electron": "^35.1.2",
+    "electron-store": "^10.0.1",
     "ssh-config": "^5.0.3",
     "ssh2": "^1.16.0"
   },

@@ -11,8 +11,11 @@
     ">
 </head>
 <body>
-<div id="titleBar" class="custom-title-bar">
+<div id="titleBar" class="title-bar">
     <div id="titleBarLeft">
+        <button id="playButton" class="titleBarButton" title="Play/Pause">&#9658;</button>
+    </div>
+    <div id="titleBarCenter">
         <span id="windowTitle">Docker Stats</span>
     </div>
     <div id="titleBarRight">
@@ -25,7 +28,6 @@
 </div>
 <div id="mainContent">
     <div id="statsView">
-        <button id="playButton">Play</button>
         <div id="statsContainer"></div>
     </div>
     <div id="settingsOverlay" class="overlay">
@@ -84,15 +86,15 @@
                         </div>
                         <div id="settingsTableFields" class="settingsPanel">
                             <form id="keysForm">
-                                <label><input type="checkbox" name="dockerKey" value="ID" /> ID</label><br />
-                                <label><input type="checkbox" name="dockerKey" value="Container" /> Container</label><br />
-                                <label><input type="checkbox" name="dockerKey" value="Name" /> Name</label><br />
-                                <label><input type="checkbox" name="dockerKey" value="CPUPerc" /> CPU %</label><br />
-                                <label><input type="checkbox" name="dockerKey" value="MemUsage" /> Memory Usage</label><br />
-                                <label><input type="checkbox" name="dockerKey" value="MemPerc" /> Memory %</label><br />
-                                <label><input type="checkbox" name="dockerKey" value="NetIO" /> Network I/O</label><br />
-                                <label><input type="checkbox" name="dockerKey" value="BlockIO" /> Block I/O</label><br />
-                                <label><input type="checkbox" name="dockerKey" value="PIDs" /> PIDs</label><br />
+                                <label><input type="checkbox" name="tableField" value="ID" /> ID</label><br />
+                                <label><input type="checkbox" name="tableField" value="Container" /> Container</label><br />
+                                <label><input type="checkbox" name="tableField" value="Name" /> Name</label><br />
+                                <label><input type="checkbox" name="tableField" value="CPUPerc" /> CPU %</label><br />
+                                <label><input type="checkbox" name="tableField" value="MemUsage" /> Memory Usage</label><br />
+                                <label><input type="checkbox" name="tableField" value="MemPerc" /> Memory %</label><br />
+                                <label><input type="checkbox" name="tableField" value="NetIO" /> Network I/O</label><br />
+                                <label><input type="checkbox" name="tableField" value="BlockIO" /> Block I/O</label><br />
+                                <label><input type="checkbox" name="tableField" value="PIDs" /> PIDs</label><br />
                             </form>
                         </div>
                         <div id="settingsAppearance" class="settingsPanel">
