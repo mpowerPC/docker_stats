@@ -1,10 +1,10 @@
 // main.js
-import { app, BrowserWindow, ipcMain, nativeTheme, globalShortcut } from 'electron';
+import {app, BrowserWindow, globalShortcut, ipcMain, nativeTheme} from 'electron';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { Client } from 'ssh2';
+import {fileURLToPath} from 'url';
+import {Client} from 'ssh2';
 import Store from 'electron-store';
-import { getAllSSHConnections, getSSHConfigForAlias } from './sshConfigHelper.js';
+import {getAllSSHConnections, getSSHConfigForAlias} from './sshConfigHelper.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,23 +18,23 @@ function saveBounds() {
         store.set('windowBounds', mainWindow.getBounds());
     }
 }
-  
+
 function createMainWindow() {
-    const savedBounds = store.get('windowBounds') || { width: 800, height: 600 };
-  
+    const savedBounds = store.get('windowBounds') || {width: 800, height: 600};
+
     mainWindow = new BrowserWindow({
-      width: savedBounds.width,
-      height: savedBounds.height,
-      minHeight: 40,
-      minWidth: 250,
-      frame: false,
-      webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
-        contextIsolation: true,
-        nodeIntegration: false,
-      },
+        width: savedBounds.width,
+        height: savedBounds.height,
+        minHeight: 40,
+        minWidth: 250,
+        frame: false,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+        },
     });
-  
+
     mainWindow.loadFile('index.html');
     mainWindow.setMenu(null);
 
@@ -52,9 +52,9 @@ ipcMain.handle('store-set', (event, key, value) => {
     return true;
 });
 
-ipcMain.on('start-docker-stats', (event, { hostAlias, dockerAppsFilter, tableFields }) => {
+ipcMain.on('start-docker-stats', (event, {hostAlias, dockerAppsFilter, tableFields}) => {
     if (!hostAlias || typeof hostAlias !== 'string') {
-        event.sender.send('docker-stats-update', { host: hostAlias, error: 'Invalid host alias.' });
+        event.sender.send('docker-stats-update', {host: hostAlias, error: 'Invalid host alias.'});
         return;
     }
 
@@ -62,66 +62,87 @@ ipcMain.on('start-docker-stats', (event, { hostAlias, dockerAppsFilter, tableFie
     try {
         connectionData = getSSHConfigForAlias(hostAlias);
     } catch (err) {
-        event.sender.send('docker-stats-update', { host: hostAlias, error: err.message });
+        event.sender.send('docker-stats-update', {host: hostAlias, error: err.message});
         return;
     }
 
-    const client = new Client();
-    client.on('ready', () => {
-        let containers = '';
-        if (Array.isArray(dockerAppsFilter) && dockerAppsFilter.length > 0) {
-            containers = dockerAppsFilter.join(' ') + ' ';
-        }
+    const maxRetries = 5;
+    let retryCount = 0;
+    const retryDelay = 5000;
 
-        let formatString = '{{json .}}';
-        if (Array.isArray(tableFields) && tableFields.length > 0) {
-            const parts = tableFields.map(key => `"${key}":"{{.${key}}}"`);
-            formatString = `{${parts.join(',')}}`;
-        }
+    function connectClient() {
+        const client = new Client();
 
-        let cmd = `docker stats ${containers}--format '${formatString}'`;
-        client.exec(cmd, (err, stream) => {
-            if (err) {
-                client.end();
-                event.sender.send('docker-stats-update', { host: hostAlias, error: err.message });
-                return;
+        client.on('ready', () => {
+            let containers = '';
+            if (Array.isArray(dockerAppsFilter) && dockerAppsFilter.length > 0) {
+                containers = dockerAppsFilter.join(' ') + ' ';
             }
 
-            activeDockerStreams[hostAlias] = client;
-            stream.on('data', (data) => {
-                let lines = data.toString().split('\n').filter(line => line.trim().length > 0);
-                let parsedUpdates = [];
-                lines.forEach(line => {
-                    try {
-                        if (line.trim().length > 25) {
-                            const parsed = JSON.parse(line);
-                            parsedUpdates.push(parsed);
+            let formatString = '{{json .}}';
+            if (Array.isArray(tableFields) && tableFields.length > 0) {
+                const parts = tableFields.map(key => `"${key}":"{{.${key}}}"`);
+                formatString = `{${parts.join(',')}}`;
+            }
+
+            let cmd = `docker stats ${containers}--format '${formatString}'`;
+            client.exec(cmd, (err, stream) => {
+                if (err) {
+                    client.end();
+                    event.sender.send('docker-stats-update', {host: hostAlias, error: err.message});
+                    return;
+                }
+
+                activeDockerStreams[hostAlias] = client;
+
+                stream.on('data', (data) => {
+                    let lines = data.toString().split('\n').filter(line => line.trim().length > 0);
+                    let parsedUpdates = [];
+                    lines.forEach(line => {
+                        try {
+                            if (line.trim().length > 25) {
+                                const parsed = JSON.parse(line);
+                                parsedUpdates.push(parsed);
+                            }
+                        } catch (e) {
+                            console.error(`Error parsing docker stats JSON for ${hostAlias}:`, e);
                         }
-                    } catch (e) {
-                        console.error(`Error parsing docker stats JSON for ${hostAlias}:`, e);
+                    });
+
+                    if (parsedUpdates.length > 0) {
+                        event.sender.send('docker-stats-update', {host: hostAlias, data: parsedUpdates});
                     }
                 });
 
-                if (parsedUpdates.length > 0) {
-                    event.sender.send('docker-stats-update', { host: hostAlias, data: parsedUpdates });
-                }
-            });
-
-            stream.on('close', () => {
-                client.end();
-                delete activeDockerStreams[hostAlias];
+                stream.on('close', () => {
+                    client.end();
+                    delete activeDockerStreams[hostAlias];
+                });
             });
         });
-    });
 
-    client.on('error', err => {
-        event.sender.send('docker-stats-update', { host: hostAlias, error: err.message });
-    });
+        client.on('error', (err) => {
+            console.error(`Connection error for ${hostAlias}:`, err.message);
 
-    client.connect(connectionData);
+            if (retryCount < maxRetries) {
+                retryCount++;
+                console.log(`Retrying connection for ${hostAlias} (${retryCount}/${maxRetries})...`);
+                setTimeout(connectClient, retryDelay);
+            } else {
+                event.sender.send('docker-stats-update', {
+                    host: hostAlias,
+                    error: `Connection failed after ${maxRetries} retries: ${err.message}`
+                });
+            }
+        });
+
+        client.connect(connectionData);
+    }
+
+    connectClient();
 });
 
-ipcMain.on('stop-docker-stats', (event, { hostAlias }) => {
+ipcMain.on('stop-docker-stats', (event, {hostAlias}) => {
     if (activeDockerStreams[hostAlias]) {
         activeDockerStreams[hostAlias].end();
         delete activeDockerStreams[hostAlias];
@@ -142,7 +163,7 @@ ipcMain.handle('get-ssh-config', async (event, hostAlias) => {
         return getSSHConfigForAlias(hostAlias);
     } catch (err) {
         console.error("Error retrieving SSH config for", hostAlias, ":", err.message);
-        return { error: err.message };
+        return {error: err.message};
     }
 });
 
@@ -155,7 +176,7 @@ ipcMain.handle('get-docker-apps', async (event, connectionAlias) => {
                 client.exec('docker ps --format "{{.Names}}"', (err, stream) => {
                     if (err) {
                         client.end();
-                        return reject({ error: err.message });
+                        return reject({error: err.message});
                     }
                     let output = '';
                     stream.on('data', data => {
@@ -172,12 +193,12 @@ ipcMain.handle('get-docker-apps', async (event, connectionAlias) => {
                 });
             });
             client.on('error', err => {
-                reject({ error: err.message });
+                reject({error: err.message});
             });
             client.connect(sshConfig);
         });
     } catch (err) {
-        return { error: err.message };
+        return {error: err.message};
     }
 });
 
@@ -223,15 +244,15 @@ app.whenReady().then(() => {
 
     globalShortcut.register('CommandOrControl+Shift+I', () => {
         if (mainWindow) {
-          const isVisible = mainWindow.webContents.isDevToolsOpened();
-          if (isVisible) {
-            mainWindow.webContents.closeDevTools();
-          } else {
-            mainWindow.webContents.openDevTools();
-          }
+            const isVisible = mainWindow.webContents.isDevToolsOpened();
+            if (isVisible) {
+                mainWindow.webContents.closeDevTools();
+            } else {
+                mainWindow.webContents.openDevTools();
+            }
         }
-      });
-    
+    });
+
 }).catch((error) => {
     console.error('Error during app initialization:', error);
 });
